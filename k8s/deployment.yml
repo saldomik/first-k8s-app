@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: express-k8s-app
+  name: express-k8s-app-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: express-k8s-app
+  template:
+    metadata:
+      labels:
+        app: express-k8s-app
+    spec:
+      volumes:
+        - name: express-k8s-app-storage
+          persistentVolumeClaim:
+            claimName: express-k8s-app-pvc 
+      containers:
+        - image: localhost:5001/express-k8s-app:4
+          name: express-k8s-app
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+          env:
+            - name: POSTGRES_HOST
+              value: "express-db-postgresql.default.svc.cluster.local"
+            - name: POSTGRES_DB_NAME
+              value: "postgres"
+            - name: POSTGRES_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: username
+            - name: POSTGRES_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 4
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /liveness
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 6
+            timeoutSeconds: 4
+            failureThreshold: 20
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 3000
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 4
+            successThreshold: 1
+            failureThreshold: 2
+          volumeMounts:
+            - mountPath: "/tmp"
+              name: express-k8s-app-storage
